@@ -125,7 +125,8 @@ def process_approval(expense_id: int, approver_id: int, action: str, comments: s
                 WHERE expense_id = %s AND status = 'pending'
             """, (expense_id,))
             
-            pending_count = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            pending_count = result[0] if result else 0
             
             if pending_count == 0:
                 # All approvals complete, approve the expense
@@ -210,7 +211,8 @@ def check_conditional_approval(expense_id: int, company_id: int) -> bool:
                     WHERE expense_id = %s AND approver_id = %s AND status = 'approved'
                 """, (expense_id, specific_approver_id))
                 
-                if cursor.fetchone()[0] > 0:
+                result = cursor.fetchone()
+                if result and result[0] > 0:
                     return True
             
             # Check percentage rule
@@ -224,6 +226,8 @@ def check_conditional_approval(expense_id: int, company_id: int) -> bool:
                 """, (expense_id,))
                 
                 result = cursor.fetchone()
+                if not result:
+                    continue
                 total_approvers, approved_count = result
                 
                 if total_approvers > 0:

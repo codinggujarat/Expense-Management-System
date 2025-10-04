@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import get_current_user, require_role
-from database import get_company_users, create_user, get_connection
+from database import get_company_users, create_user, get_connection, update_user_role, update_user_manager
 from approval_service import create_approval_rule, get_company_approval_rules
 import hashlib
 
@@ -10,6 +10,9 @@ def show_admin_dashboard():
     st.title("Admin Dashboard")
     
     user = get_current_user()
+    if not user:
+        st.error("User session not found")
+        return
     company_id = user['company_id']
     
     # Create tabs for different admin functions
@@ -37,17 +40,52 @@ def show_user_management(company_id: int):
     if users:
         st.subheader("Current Users")
         for user in users:
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
-            with col1:
-                st.write(f"**{user['name']}**")
-                st.write(user['email'])
-            with col2:
-                st.write(user['role'].title())
-            with col3:
-                st.write(user['manager_name'] if user['manager_name'] else "No Manager")
-            with col4:
-                if st.button(f"Edit {user['id']}", key=f"edit_{user['id']}"):
-                    st.session_state[f"edit_user_{user['id']}"] = True
+            with st.expander(f"{user['name']} - {user['role'].title()}"):
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.write(f"**Email:** {user['email']}")
+                    st.write(f"**Current Role:** {user['role'].title()}")
+                    st.write(f"**Manager:** {user['manager_name'] if user['manager_name'] else 'No Manager'}")
+                
+                with col2:
+                    # Edit user form
+                    with st.form(f"edit_user_{user['id']}"):
+                        new_role = st.selectbox("Update Role", ["employee", "manager", "admin"], 
+                                               index=["employee", "manager", "admin"].index(user['role']),
+                                               key=f"role_{user['id']}")
+                        
+                        managers = [u for u in users if u['role'] in ['admin', 'manager'] and u['id'] != user['id']]
+                        manager_options = ["No Manager"] + [f"{mgr['name']} ({mgr['email']})" for mgr in managers]
+                        
+                        current_manager_idx = 0
+                        if user['manager_name']:
+                            for idx, opt in enumerate(manager_options):
+                                if user['manager_name'] in opt:
+                                    current_manager_idx = idx
+                                    break
+                        
+                        new_manager = st.selectbox("Update Manager", manager_options, 
+                                                  index=current_manager_idx,
+                                                  key=f"manager_{user['id']}")
+                        
+                        if st.form_submit_button("Update User"):
+                            # Update role if changed
+                            if new_role != user['role']:
+                                if update_user_role(user['id'], new_role):
+                                    st.success(f"Role updated to {new_role}")
+                            
+                            # Update manager if changed
+                            new_manager_id = None
+                            if new_manager != "No Manager":
+                                manager_email = new_manager.split('(')[1].split(')')[0]
+                                new_manager_id = next((mgr['id'] for mgr in managers if mgr['email'] == manager_email), None)
+                            
+                            if new_manager_id != user['manager_id']:
+                                if update_user_manager(user['id'], new_manager_id):
+                                    st.success("Manager updated")
+                            
+                            st.rerun()
     
     st.divider()
     
@@ -202,6 +240,10 @@ def show_company_overview(company_id: int):
         
         expense_stats = cursor.fetchone()
         
+        if not user_stats or not expense_stats:
+            st.error("Failed to load statistics")
+            return
+        
         # Display stats
         col1, col2, col3 = st.columns(3)
         
@@ -218,8 +260,9 @@ def show_company_overview(company_id: int):
             st.metric("Approved Expenses", expense_stats[2])
             st.metric("Rejected Expenses", expense_stats[3])
             if expense_stats[4]:
-                user = get_current_user()
-                st.metric("Total Approved Amount", f"{user['default_currency']} {expense_stats[4]:,.2f}")
+                current_user = get_current_user()
+                if current_user:
+                    st.metric("Total Approved Amount", f"{current_user['default_currency']} {expense_stats[4]:,.2f}")
         
     except Exception as e:
         st.error(f"Failed to load company overview: {e}")

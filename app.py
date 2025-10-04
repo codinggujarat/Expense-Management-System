@@ -78,24 +78,38 @@ def login_signup_page():
                         st.error("Email already exists")
                     else:
                         # Extract currency from selection
-                        currency = selected_country.split('(')[1].split(')')[0] if '(' in selected_country else 'USD'
+                        if selected_country and '(' in selected_country:
+                            currency = selected_country.split('(')[1].split(')')[0]
+                        else:
+                            currency = 'USD'
                         
                         # Create company first
                         company_id = create_company(company_name, currency)
                         
-                        # Create admin user
-                        user_id = create_user(name, email, hash_password(password), 'admin', company_id)
-                        
-                        if user_id:
-                            st.success("Account created successfully! Please login.")
+                        if company_id:
+                            # Create admin user
+                            user_id = create_user(name, email, hash_password(password), 'admin', company_id)
+                            
+                            if user_id:
+                                st.success("Account created successfully! Please login.")
+                            else:
+                                st.error("Failed to create account")
                         else:
-                            st.error("Failed to create account")
+                            st.error("Failed to create company")
                 else:
                     st.error("Please fill in all fields")
 
 def main_app():
     """Main application with role-based navigation"""
     user = get_current_user()
+    
+    if not user:
+        st.error("Session expired. Please login again.")
+        for key in ['user_id', 'email', 'role', 'company_id']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun()
+        return
     
     # Sidebar navigation
     st.sidebar.title(f"Welcome, {user['name']}")

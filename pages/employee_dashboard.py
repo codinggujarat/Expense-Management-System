@@ -9,6 +9,9 @@ def show_employee_dashboard():
     st.title("Employee Dashboard")
     
     user = get_current_user()
+    if not user:
+        st.error("User session not found")
+        return
     
     # Welcome message
     st.header(f"Welcome, {user['name']}!")

@@ -10,6 +10,9 @@ def show_manager_dashboard():
     st.title("Manager Dashboard")
     
     user = get_current_user()
+    if not user:
+        st.error("User session not found")
+        return
     
     # Get pending approvals
     pending_approvals = get_pending_approvals(user['id'])
@@ -188,8 +191,9 @@ def show_team_expenses_overview(manager_id: int):
                         st.metric("Rejected", rejected)
                     
                     if total_amount > 0:
-                        user = get_current_user()
-                        st.write(f"**Total Approved Amount:** {format_currency(total_amount, user['default_currency'])}")
+                        current_user = get_current_user()
+                        if current_user:
+                            st.write(f"**Total Approved Amount:** {format_currency(total_amount, current_user['default_currency'])}")
         else:
             st.info("No team members found or no expenses submitted yet.")
         

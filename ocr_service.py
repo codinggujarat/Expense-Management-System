@@ -23,9 +23,9 @@ def extract_text_from_image(image) -> Optional[str]:
         st.error(f"OCR processing failed: {e}")
         return None
 
-def parse_receipt_data(text: str) -> Dict:
+def parse_receipt_data(text: str) -> Dict[str, any]:
     """Parse OCR text to extract expense data"""
-    receipt_data = {
+    receipt_data: Dict[str, any] = {
         'amount': None,
         'date': None,
         'merchant': None,
@@ -120,7 +120,7 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         st.error(f"Failed to save receipt: {e}")
         return None
 
-def process_receipt_upload(uploaded_file) -> Optional[Dict]:
+def process_receipt_upload(uploaded_file) -> Optional[Dict[str, any]]:
     """Process uploaded receipt file and return extracted data"""
     if not uploaded_file:
         return None

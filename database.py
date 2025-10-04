@@ -119,9 +119,12 @@ def create_company(name: str, currency: str) -> Optional[int]:
             "INSERT INTO companies (name, default_currency) VALUES (%s, %s) RETURNING id",
             (name, currency)
         )
-        company_id = cursor.fetchone()[0]
-        conn.commit()
-        return company_id
+        result = cursor.fetchone()
+        if result:
+            company_id = result[0]
+            conn.commit()
+            return company_id
+        return None
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create company: {e}")
@@ -142,9 +145,12 @@ def create_user(name: str, email: str, password_hash: str, role: str, company_id
             "INSERT INTO users (name, email, password_hash, role, company_id, manager_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
             (name, email, password_hash, role, company_id, manager_id)
         )
-        user_id = cursor.fetchone()[0]
-        conn.commit()
-        return user_id
+        result = cursor.fetchone()
+        if result:
+            user_id = result[0]
+            conn.commit()
+            return user_id
+        return None
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create user: {e}")
@@ -276,9 +282,12 @@ def create_expense(employee_id: int, company_id: int, amount: float, currency: s
         """, (employee_id, company_id, amount, currency, converted_amount, 
               category, description, expense_date, receipt_path))
         
-        expense_id = cursor.fetchone()[0]
-        conn.commit()
-        return expense_id
+        result = cursor.fetchone()
+        if result:
+            expense_id = result[0]
+            conn.commit()
+            return expense_id
+        return None
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create expense: {e}")
@@ -386,6 +395,50 @@ def update_approval(approval_id: int, status: str, comments: str) -> bool:
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to update approval: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_user_role(user_id: int, new_role: str) -> bool:
+    """Update user role"""
+    conn = get_connection()
+    if not conn:
+        return False
+        
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE users SET role = %s WHERE id = %s
+        """, (new_role, user_id))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Failed to update user role: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_user_manager(user_id: int, manager_id: Optional[int]) -> bool:
+    """Update user manager"""
+    conn = get_connection()
+    if not conn:
+        return False
+        
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE users SET manager_id = %s WHERE id = %s
+        """, (manager_id, user_id))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Failed to update user manager: {e}")
         return False
     finally:
         cursor.close()
