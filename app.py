@@ -1,3 +1,4 @@
+from typing import Any
 import streamlit as st
 import os
 from database import init_database, get_user_by_email, create_user, create_company
@@ -111,7 +112,7 @@ def main_app():
         return
     
     # Check for navigation requests
-    navigate_to = st.session_state.get('navigate_to')
+    navigate_to: Any | None = st.session_state.get('navigate_to')
     if navigate_to:
         del st.session_state['navigate_to']  # Clear the navigation request
     else:

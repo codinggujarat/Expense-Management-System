@@ -73,7 +73,7 @@ Approval Rule supports:
 ## Screenshots
 
 ### Dashboard
-![Dashboard Screenshot](screenshots/dashboard.png)
+![Dashboard Screenshot](/Screenshots/image.png)
 
 
 ---
