@@ -66,7 +66,9 @@ Approval Rule supports:
 
 ---
 ## Demo Video
-🎥 [Watch the Demo Video](https://your-video-link.com)
+🎥 [Watch the Demo Video](https://youtu.be/ynlQustfO-I)
+
+[![Expense Management System Demo](./Screenshots/image.png)](https://youtu.be/ynlQustfO-I)
 
 ---
 
