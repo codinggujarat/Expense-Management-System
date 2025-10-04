@@ -4,7 +4,6 @@ from database import init_database, get_user_by_email, create_user, create_compa
 from auth import authenticate_user, get_current_user
 from currency_service import get_countries_and_currencies
 import hashlib
-
 # Initialize database
 init_database()
 
@@ -111,6 +110,13 @@ def main_app():
         st.rerun()
         return
     
+    # Check for navigation requests
+    navigate_to = st.session_state.get('navigate_to')
+    if navigate_to:
+        del st.session_state['navigate_to']  # Clear the navigation request
+    else:
+        navigate_to = None
+    
     # Sidebar navigation
     st.sidebar.title(f"Welcome, {user['name']}")
     st.sidebar.write(f"Role: {user['role'].title()}")
@@ -135,11 +141,21 @@ def main_app():
             "Expense Submission": "pages.expense_submission"
         }
     
-    selected_page = st.sidebar.selectbox("Navigate", list(pages.keys()))
+    # If navigation request exists, select that page
+    if navigate_to:
+        # Find the page key that corresponds to the navigation target
+        for page_key, page_path in pages.items():
+            if navigate_to in page_path:
+                selected_page = page_key
+                break
+        else:
+            selected_page = st.sidebar.selectbox("Navigate", list(pages.keys()))
+    else:
+        selected_page = st.sidebar.selectbox("Navigate", list(pages.keys()))
     
     # Logout button
     if st.sidebar.button("Logout"):
-        for key in ['user_id', 'email', 'role', 'company_id']:
+        for key in ['user_id', 'email', 'role', 'company_id', 'navigate_to']:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()

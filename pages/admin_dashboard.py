@@ -223,7 +223,7 @@ def show_company_overview(company_id: int):
                 COUNT(CASE WHEN role = 'employee' THEN 1 END) as employees,
                 COUNT(CASE WHEN role = 'manager' THEN 1 END) as managers,
                 COUNT(CASE WHEN role = 'admin' THEN 1 END) as admins
-            FROM users WHERE company_id = %s
+            FROM users WHERE company_id = ?
         """, (company_id,))
         
         user_stats = cursor.fetchone()
@@ -235,7 +235,7 @@ def show_company_overview(company_id: int):
                 COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
                 COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected,
                 SUM(CASE WHEN status = 'approved' THEN converted_amount END) as total_approved_amount
-            FROM expenses WHERE company_id = %s
+            FROM expenses WHERE company_id = ?
         """, (company_id,))
         
         expense_stats = cursor.fetchone()
@@ -288,7 +288,7 @@ def show_expense_reports(company_id: int):
                    e.category, e.description, e.expense_date, e.status, e.created_at
             FROM expenses e
             JOIN users u ON e.employee_id = u.id
-            WHERE e.company_id = %s
+            WHERE e.company_id = ?
             ORDER BY e.created_at DESC
         """, (company_id,))
         

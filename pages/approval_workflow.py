@@ -50,7 +50,7 @@ def show_pending_approvals_detailed(user):
             FROM expenses e
             JOIN users u ON e.employee_id = u.id
             JOIN expense_approvals ea ON e.id = ea.expense_id
-            WHERE ea.approver_id = %s AND ea.status = 'pending'
+            WHERE ea.approver_id = ? AND ea.status = 'pending'
             ORDER BY ea.created_at ASC
         """, (user['id'],))
         
@@ -208,7 +208,7 @@ def show_approval_history_view(user):
             FROM expense_approvals ea
             JOIN expenses e ON ea.expense_id = e.id
             JOIN users u ON e.employee_id = u.id
-            WHERE ea.approver_id = %s AND ea.status IN ('approved', 'rejected')
+            WHERE ea.approver_id = ? AND ea.status IN ('approved', 'rejected')
             ORDER BY ea.approved_at DESC
             LIMIT 50
         """, (user['id'],))

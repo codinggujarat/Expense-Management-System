@@ -100,7 +100,7 @@ def get_team_size(manager_id: int) -> int:
     try:
         cursor.execute("""
             SELECT COUNT(*) FROM users 
-            WHERE manager_id = %s
+            WHERE manager_id = ?
         """, (manager_id,))
         
         result = cursor.fetchone()
@@ -124,9 +124,9 @@ def get_approved_count_this_month(approver_id: int) -> int:
     try:
         cursor.execute("""
             SELECT COUNT(*) FROM expense_approvals 
-            WHERE approver_id = %s 
+            WHERE approver_id = ? 
             AND status = 'approved' 
-            AND DATE_TRUNC('month', approved_at) = DATE_TRUNC('month', CURRENT_DATE)
+            AND DATE(approved_at) >= DATE('now', 'start of month')
         """, (approver_id,))
         
         result = cursor.fetchone()
@@ -162,7 +162,7 @@ def show_team_expenses_overview(manager_id: int):
                 SUM(CASE WHEN e.status = 'approved' THEN e.converted_amount END) as total_approved_amount
             FROM users u
             LEFT JOIN expenses e ON u.id = e.employee_id
-            WHERE u.manager_id = %s
+            WHERE u.manager_id = ?
             GROUP BY u.id, u.name
             ORDER BY u.name
         """, (manager_id,))

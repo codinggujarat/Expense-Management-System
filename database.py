@@ -1,18 +1,15 @@
-import psycopg2
+import sqlite3
 import os
 from typing import Optional, Dict, List
 import streamlit as st
 
 def get_connection():
-    """Get database connection using environment variables"""
+    """Get database connection using SQLite"""
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("PGHOST"),
-            database=os.getenv("PGDATABASE"),
-            user=os.getenv("PGUSER"),
-            password=os.getenv("PGPASSWORD"),
-            port=os.getenv("PGPORT", 5432)
-        )
+        # Create data directory if it doesn't exist
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/expense_management.db")
+        conn.row_factory = sqlite3.Row  # Enable column access by name
         return conn
     except Exception as e:
         st.error(f"Database connection failed: {e}")
@@ -30,9 +27,9 @@ def init_database():
         # Companies table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS companies (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                default_currency VARCHAR(10) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                default_currency TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -40,61 +37,69 @@ def init_database():
         # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'manager', 'employee')),
-                company_id INTEGER REFERENCES companies(id),
-                manager_id INTEGER REFERENCES users(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'employee')),
+                company_id INTEGER,
+                manager_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES companies (id),
+                FOREIGN KEY (manager_id) REFERENCES users (id)
             )
         """)
         
         # Expenses table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
-                id SERIAL PRIMARY KEY,
-                employee_id INTEGER REFERENCES users(id),
-                company_id INTEGER REFERENCES companies(id),
-                amount DECIMAL(10,2) NOT NULL,
-                currency VARCHAR(10) NOT NULL,
-                converted_amount DECIMAL(10,2),
-                category VARCHAR(100) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER,
+                company_id INTEGER,
+                amount REAL NOT NULL,
+                currency TEXT NOT NULL,
+                converted_amount REAL,
+                category TEXT NOT NULL,
                 description TEXT,
                 expense_date DATE NOT NULL,
-                receipt_path VARCHAR(500),
-                status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                receipt_path TEXT,
+                status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (employee_id) REFERENCES users (id),
+                FOREIGN KEY (company_id) REFERENCES companies (id)
             )
         """)
         
         # Approval workflows table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS approval_workflows (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id),
-                name VARCHAR(255) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER,
+                name TEXT NOT NULL,
                 sequence_order INTEGER NOT NULL,
-                approver_id INTEGER REFERENCES users(id),
+                approver_id INTEGER,
                 is_manager_approver BOOLEAN DEFAULT FALSE,
                 percentage_rule INTEGER,
                 specific_approver_rule BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES companies (id),
+                FOREIGN KEY (approver_id) REFERENCES users (id)
             )
         """)
         
         # Expense approvals table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expense_approvals (
-                id SERIAL PRIMARY KEY,
-                expense_id INTEGER REFERENCES expenses(id),
-                approver_id INTEGER REFERENCES users(id),
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                expense_id INTEGER,
+                approver_id INTEGER,
                 sequence_order INTEGER NOT NULL,
-                status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+                status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
                 comments TEXT,
                 approved_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (expense_id) REFERENCES expenses (id),
+                FOREIGN KEY (approver_id) REFERENCES users (id)
             )
         """)
         
@@ -116,15 +121,12 @@ def create_company(name: str, currency: str) -> Optional[int]:
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO companies (name, default_currency) VALUES (%s, %s) RETURNING id",
+            "INSERT INTO companies (name, default_currency) VALUES (?, ?)",
             (name, currency)
         )
-        result = cursor.fetchone()
-        if result:
-            company_id = result[0]
-            conn.commit()
-            return company_id
-        return None
+        company_id = cursor.lastrowid
+        conn.commit()
+        return company_id
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create company: {e}")
@@ -142,15 +144,12 @@ def create_user(name: str, email: str, password_hash: str, role: str, company_id
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role, company_id, manager_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            "INSERT INTO users (name, email, password_hash, role, company_id, manager_id) VALUES (?, ?, ?, ?, ?, ?)",
             (name, email, password_hash, role, company_id, manager_id)
         )
-        result = cursor.fetchone()
-        if result:
-            user_id = result[0]
-            conn.commit()
-            return user_id
-        return None
+        user_id = cursor.lastrowid
+        conn.commit()
+        return user_id
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create user: {e}")
@@ -171,7 +170,7 @@ def get_user_by_email(email: str) -> Optional[Dict]:
             SELECT u.id, u.name, u.email, u.password_hash, u.role, u.company_id, u.manager_id, c.name as company_name, c.default_currency
             FROM users u
             JOIN companies c ON u.company_id = c.id
-            WHERE u.email = %s
+            WHERE u.email = ?
         """, (email,))
         
         result = cursor.fetchone()
@@ -207,7 +206,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
             SELECT u.id, u.name, u.email, u.role, u.company_id, u.manager_id, c.name as company_name, c.default_currency
             FROM users u
             JOIN companies c ON u.company_id = c.id
-            WHERE u.id = %s
+            WHERE u.id = ?
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -242,7 +241,7 @@ def get_company_users(company_id: int) -> List[Dict]:
             SELECT u.id, u.name, u.email, u.role, u.manager_id, m.name as manager_name
             FROM users u
             LEFT JOIN users m ON u.manager_id = m.id
-            WHERE u.company_id = %s
+            WHERE u.company_id = ?
             ORDER BY u.role, u.name
         """, (company_id,))
         
@@ -278,16 +277,13 @@ def create_expense(employee_id: int, company_id: int, amount: float, currency: s
         cursor.execute("""
             INSERT INTO expenses (employee_id, company_id, amount, currency, converted_amount, 
                                 category, description, expense_date, receipt_path)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (employee_id, company_id, amount, currency, converted_amount, 
               category, description, expense_date, receipt_path))
         
-        result = cursor.fetchone()
-        if result:
-            expense_id = result[0]
-            conn.commit()
-            return expense_id
-        return None
+        expense_id = cursor.lastrowid
+        conn.commit()
+        return expense_id
     except Exception as e:
         conn.rollback()
         st.error(f"Failed to create expense: {e}")
@@ -308,7 +304,7 @@ def get_expenses_by_user(user_id: int) -> List[Dict]:
             SELECT id, amount, currency, converted_amount, category, description, 
                    expense_date, status, created_at
             FROM expenses
-            WHERE employee_id = %s
+            WHERE employee_id = ?
             ORDER BY created_at DESC
         """, (user_id,))
         
@@ -349,7 +345,7 @@ def get_pending_approvals(approver_id: int) -> List[Dict]:
             FROM expenses e
             JOIN users u ON e.employee_id = u.id
             JOIN expense_approvals ea ON e.id = ea.expense_id
-            WHERE ea.approver_id = %s AND ea.status = 'pending'
+            WHERE ea.approver_id = ? AND ea.status = 'pending'
             ORDER BY e.created_at DESC
         """, (approver_id,))
         
@@ -386,8 +382,8 @@ def update_approval(approval_id: int, status: str, comments: str) -> bool:
     try:
         cursor.execute("""
             UPDATE expense_approvals 
-            SET status = %s, comments = %s, approved_at = CURRENT_TIMESTAMP
-            WHERE id = %s
+            SET status = ?, comments = ?, approved_at = CURRENT_TIMESTAMP
+            WHERE id = ?
         """, (status, comments, approval_id))
         
         conn.commit()
@@ -409,7 +405,7 @@ def update_user_role(user_id: int, new_role: str) -> bool:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            UPDATE users SET role = %s WHERE id = %s
+            UPDATE users SET role = ? WHERE id = ?
         """, (new_role, user_id))
         
         conn.commit()
@@ -431,7 +427,7 @@ def update_user_manager(user_id: int, manager_id: Optional[int]) -> bool:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            UPDATE users SET manager_id = %s WHERE id = %s
+            UPDATE users SET manager_id = ? WHERE id = ?
         """, (manager_id, user_id))
         
         conn.commit()

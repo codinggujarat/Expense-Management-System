@@ -16,7 +16,7 @@ def create_approval_workflow(company_id: int, expense_id: int) -> bool:
             SELECT u.manager_id, u.id as employee_id
             FROM expenses e
             JOIN users u ON e.employee_id = u.id
-            WHERE e.id = %s
+            WHERE e.id = ?
         """, (expense_id,))
         
         result = cursor.fetchone()
@@ -25,20 +25,48 @@ def create_approval_workflow(company_id: int, expense_id: int) -> bool:
         
         manager_id, employee_id = result
         
-        # Create approval workflow starting with manager (if exists)
+        # Create approval workflow starting with manager (if exists) or fall back to admin
         sequence = 1
         if manager_id:
             cursor.execute("""
                 INSERT INTO expense_approvals (expense_id, approver_id, sequence_order, status)
-                VALUES (%s, %s, %s, 'pending')
+                VALUES (?, ?, ?, 'pending')
             """, (expense_id, manager_id, sequence))
             sequence += 1
+        else:
+            # If no manager, check if there are company approval rules
+            cursor.execute("""
+                SELECT COUNT(*) FROM approval_workflows
+                WHERE company_id = ?
+            """, (company_id,))
+            
+            rule_count = cursor.fetchone()[0]
+            
+            # If no company rules exist, assign to the employee themselves as a default
+            # (they can't approve their own expense, but this allows the workflow to exist)
+            if rule_count == 0:
+                # Get the company admin as the default approver
+                cursor.execute("""
+                    SELECT id FROM users 
+                    WHERE company_id = ? AND role = 'admin'
+                    ORDER BY id
+                    LIMIT 1
+                """, (company_id,))
+                
+                admin_result = cursor.fetchone()
+                if admin_result:
+                    admin_id = admin_result[0]
+                    cursor.execute("""
+                        INSERT INTO expense_approvals (expense_id, approver_id, sequence_order, status)
+                        VALUES (?, ?, ?, 'pending')
+                    """, (expense_id, admin_id, sequence))
+                    sequence += 1
         
         # Get additional approval workflows for the company
         cursor.execute("""
             SELECT approver_id, sequence_order
             FROM approval_workflows
-            WHERE company_id = %s AND is_manager_approver = FALSE
+            WHERE company_id = ? AND is_manager_approver = FALSE
             ORDER BY sequence_order
         """, (company_id,))
         
@@ -48,7 +76,7 @@ def create_approval_workflow(company_id: int, expense_id: int) -> bool:
             approver_id, _ = workflow
             cursor.execute("""
                 INSERT INTO expense_approvals (expense_id, approver_id, sequence_order, status)
-                VALUES (%s, %s, %s, 'pending')
+                VALUES (?, ?, ?, 'pending')
             """, (expense_id, approver_id, sequence))
             sequence += 1
         
@@ -75,7 +103,7 @@ def get_next_approver(expense_id: int) -> Optional[int]:
         cursor.execute("""
             SELECT approver_id
             FROM expense_approvals
-            WHERE expense_id = %s AND status = 'pending'
+            WHERE expense_id = ? AND status = 'pending'
             ORDER BY sequence_order
             LIMIT 1
         """, (expense_id,))
@@ -102,27 +130,27 @@ def process_approval(expense_id: int, approver_id: int, action: str, comments: s
         # Update the approval record
         cursor.execute("""
             UPDATE expense_approvals
-            SET status = %s, comments = %s, approved_at = CURRENT_TIMESTAMP
-            WHERE expense_id = %s AND approver_id = %s AND status = 'pending'
+            SET status = ?, comments = ?, approved_at = CURRENT_TIMESTAMP
+            WHERE expense_id = ? AND approver_id = ? AND status = 'pending'
         """, (action, comments, expense_id, approver_id))
         
         if action == 'rejected':
             # If rejected, update expense status and reject all pending approvals
             cursor.execute("""
-                UPDATE expenses SET status = 'rejected' WHERE id = %s
+                UPDATE expenses SET status = 'rejected' WHERE id = ?
             """, (expense_id,))
             
             cursor.execute("""
                 UPDATE expense_approvals 
                 SET status = 'rejected', comments = 'Auto-rejected due to earlier rejection'
-                WHERE expense_id = %s AND status = 'pending' AND approver_id != %s
+                WHERE expense_id = ? AND status = 'pending' AND approver_id != ?
             """, (expense_id, approver_id))
             
         elif action == 'approved':
             # Check if this was the last required approval
             cursor.execute("""
                 SELECT COUNT(*) FROM expense_approvals
-                WHERE expense_id = %s AND status = 'pending'
+                WHERE expense_id = ? AND status = 'pending'
             """, (expense_id,))
             
             result = cursor.fetchone()
@@ -131,7 +159,7 @@ def process_approval(expense_id: int, approver_id: int, action: str, comments: s
             if pending_count == 0:
                 # All approvals complete, approve the expense
                 cursor.execute("""
-                    UPDATE expenses SET status = 'approved' WHERE id = %s
+                    UPDATE expenses SET status = 'approved' WHERE id = ?
                 """, (expense_id,))
         
         conn.commit()
@@ -158,7 +186,7 @@ def get_approval_history(expense_id: int) -> List[Dict]:
             SELECT ea.sequence_order, u.name, ea.status, ea.comments, ea.approved_at
             FROM expense_approvals ea
             JOIN users u ON ea.approver_id = u.id
-            WHERE ea.expense_id = %s
+            WHERE ea.expense_id = ?
             ORDER BY ea.sequence_order
         """, (expense_id,))
         
@@ -196,7 +224,7 @@ def check_conditional_approval(expense_id: int, company_id: int) -> bool:
         cursor.execute("""
             SELECT aw.percentage_rule, aw.specific_approver_rule, aw.approver_id
             FROM approval_workflows aw
-            WHERE aw.company_id = %s AND (aw.percentage_rule IS NOT NULL OR aw.specific_approver_rule = TRUE)
+            WHERE aw.company_id = ? AND (aw.percentage_rule IS NOT NULL OR aw.specific_approver_rule = TRUE)
         """, (company_id,))
         
         workflows = cursor.fetchall()
@@ -208,7 +236,7 @@ def check_conditional_approval(expense_id: int, company_id: int) -> bool:
             if specific_approver_rule:
                 cursor.execute("""
                     SELECT COUNT(*) FROM expense_approvals
-                    WHERE expense_id = %s AND approver_id = %s AND status = 'approved'
+                    WHERE expense_id = ? AND approver_id = ? AND status = 'approved'
                 """, (expense_id, specific_approver_id))
                 
                 result = cursor.fetchone()
@@ -222,7 +250,7 @@ def check_conditional_approval(expense_id: int, company_id: int) -> bool:
                         COUNT(*) as total_approvers,
                         COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved_count
                     FROM expense_approvals
-                    WHERE expense_id = %s
+                    WHERE expense_id = ?
                 """, (expense_id,))
                 
                 result = cursor.fetchone()
@@ -259,7 +287,7 @@ def create_approval_rule(company_id: int, name: str, approver_id: int, sequence_
             INSERT INTO approval_workflows 
             (company_id, name, approver_id, sequence_order, percentage_rule, 
              specific_approver_rule, is_manager_approver)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (company_id, name, approver_id, sequence_order, percentage_rule, 
               specific_approver_rule, is_manager_approver))
         
@@ -288,7 +316,7 @@ def get_company_approval_rules(company_id: int) -> List[Dict]:
                    aw.percentage_rule, aw.specific_approver_rule, aw.is_manager_approver
             FROM approval_workflows aw
             JOIN users u ON aw.approver_id = u.id
-            WHERE aw.company_id = %s
+            WHERE aw.company_id = ?
             ORDER BY aw.sequence_order
         """, (company_id,))
         

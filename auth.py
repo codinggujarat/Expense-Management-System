@@ -1,6 +1,7 @@
 import streamlit as st
 from database import get_user_by_id
 from typing import Optional, Dict
+from dotenv import load_dotenv
 
 def authenticate_user() -> bool:
     """Check if user is authenticated"""
