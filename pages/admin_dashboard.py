@@ -300,6 +300,15 @@ def show_expense_reports(company_id: int):
             # Create expense table
             expense_data = []
             for expense in expenses:
+                # Handle created_at field which might be a string or datetime
+                created_at = expense[9]
+                if isinstance(created_at, str):
+                    # If it's already a string, use it as is
+                    created_date = created_at.split(' ')[0]  # Get just the date part
+                else:
+                    # If it's a datetime object, format it
+                    created_date = created_at.strftime('%Y-%m-%d')
+                
                 expense_data.append({
                     'ID': expense[0],
                     'Employee': expense[1],
@@ -309,7 +318,7 @@ def show_expense_reports(company_id: int):
                     'Description': expense[6],
                     'Date': expense[7],
                     'Status': expense[8].title(),
-                    'Created': expense[9].strftime('%Y-%m-%d')
+                    'Created': created_date
                 })
             
             st.dataframe(expense_data)

@@ -139,7 +139,8 @@ def main_app():
     else:  # employee
         pages = {
             "Employee Dashboard": "pages.employee_dashboard",
-            "Expense Submission": "pages.expense_submission"
+            "Expense Submission": "pages.expense_submission",
+            "Test Expenses": "test_expenses"
         }
     
     # If navigation request exists, select that page
@@ -181,6 +182,8 @@ def main_app():
             elif module_path == "pages.approval_workflow":
                 from pages.approval_workflow import show_approval_workflow
                 show_approval_workflow()
+            elif module_path == "test_expenses":
+                import test_expenses
         except ImportError as e:
             st.error(f"Error loading page: {e}")
 

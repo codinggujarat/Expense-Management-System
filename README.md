@@ -68,14 +68,22 @@ Approval Rule supports:
 ## Demo Video
 🎥 [Watch the Demo Video](https://youtu.be/ynlQustfO-I)
 
-
 ---
 
-## Screenshots
+## 🖼️ Project Screenshots
 
-### Dashboard
-![Dashboard Screenshot](/Screenshots/image.png)
+<details>
+  <summary>📸 Click to view screenshots</summary>
 
+  | Login Page                        | Admin Dashboard                             | Manager Dashboard                                        |
+  | --------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+  | ![Login](./Screenshots/login.png) | ![Admin Dashboard](./Screenshots/image.png) | ![Manager Dashboard](./Screenshots/ManagerDashboard.png) |
+
+  | Employee Dashboard                                         | Admin Approval Flow                                 | Manager Approval Flow                           |
+  | ---------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------- |
+  | ![Employee Dashboard](./Screenshots/EmployeeDashboard.png) | ![Admin Approval](./Screenshots/admin-Approved.png) | ![Manager Approval](./Screenshots/Rejected.png) |
+
+</details>
 
 ---
 
@@ -86,6 +94,14 @@ Approval Rule supports:
 - **Authentication**: JWT / OAuth
 - **APIs**: RestCountries, ExchangeRate API
 - **OCR**: Tesseract OCR / Google Vision API
+
+---
+## 👨‍💻 Team Members
+
+- **Aman Nayak**  
+- **Vinit Patel**  
+- **Hiren Dadhaniya**  
+- **Sneha Prajapati**
 
 ---
 

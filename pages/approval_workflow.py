@@ -121,6 +121,15 @@ def show_detailed_approval_item(approval, default_currency):
     sequence_order = approval[11]
     submitted_at = approval[12]
     
+    # Handle submitted_at field which might be a string or datetime
+    if isinstance(submitted_at, str):
+        # If it's already a string, use it as is
+        submitted_date = submitted_at.split(' ')[0]  # Get just the date part
+        submitted_datetime = submitted_at  # Use the full string
+    else:
+        # If it's a datetime object, format it
+        submitted_datetime = submitted_at.strftime('%Y-%m-%d %H:%M')
+    
     with st.expander(f"#{expense_id} - {employee_name} - {category} - {format_currency(converted_amount or amount, currency)}"):
         col1, col2 = st.columns([2, 1])
         
@@ -129,7 +138,7 @@ def show_detailed_approval_item(approval, default_currency):
             st.write(f"**Category:** {category}")
             st.write(f"**Description:** {description}")
             st.write(f"**Expense Date:** {expense_date}")
-            st.write(f"**Submitted:** {submitted_at.strftime('%Y-%m-%d %H:%M')}")
+            st.write(f"**Submitted:** {submitted_datetime}")
             st.write(f"**Original Amount:** {format_currency(amount, currency)}")
             if converted_amount and currency != default_currency:
                 st.write(f"**Amount in {default_currency}:** {format_currency(converted_amount, default_currency)}")
@@ -238,6 +247,14 @@ def show_approval_history_view(user):
             for record in history:
                 expense_id, employee_name, category, amount, status, comments, approved_at = record
                 
+                # Handle approved_at field which might be a string or datetime
+                if isinstance(approved_at, str):
+                    # If it's already a string, use it as is
+                    approved_datetime = approved_at  # Use the full string
+                else:
+                    # If it's a datetime object, format it
+                    approved_datetime = approved_at.strftime('%Y-%m-%d %H:%M')
+                
                 col1, col2, col3, col4 = st.columns([2, 2, 1, 2])
                 
                 with col1:
@@ -255,7 +272,7 @@ def show_approval_history_view(user):
                         st.error("❌ Rejected")
                 
                 with col4:
-                    st.write(approved_at.strftime('%Y-%m-%d %H:%M'))
+                    st.write(approved_datetime)
                     if comments:
                         st.caption(f"💬 {comments}")
                 
@@ -290,12 +307,26 @@ def show_expense_approval_detail(expense_id: int):
                     st.warning("⏳ Pending")
                 elif step['status'] == 'approved':
                     st.success(f"✅ Approved")
-                    st.caption(f"Date: {step['approved_at'].strftime('%Y-%m-%d %H:%M')}")
+                    # Handle approved_at field which might be a string or datetime
+                    if isinstance(step['approved_at'], str):
+                        # If it's already a string, use it as is
+                        approved_datetime = step['approved_at']  # Use the full string
+                    else:
+                        # If it's a datetime object, format it
+                        approved_datetime = step['approved_at'].strftime('%Y-%m-%d %H:%M')
+                    st.caption(f"Date: {approved_datetime}")
                     if step['comments']:
                         st.caption(f"Comments: {step['comments']}")
                 elif step['status'] == 'rejected':
                     st.error(f"❌ Rejected")
-                    st.caption(f"Date: {step['approved_at'].strftime('%Y-%m-%d %H:%M')}")
+                    # Handle approved_at field which might be a string or datetime
+                    if isinstance(step['approved_at'], str):
+                        # If it's already a string, use it as is
+                        approved_datetime = step['approved_at']  # Use the full string
+                    else:
+                        # If it's a datetime object, format it
+                        approved_datetime = step['approved_at'].strftime('%Y-%m-%d %H:%M')
+                    st.caption(f"Date: {approved_datetime}")
                     if step['comments']:
                         st.caption(f"Comments: {step['comments']}")
     else:

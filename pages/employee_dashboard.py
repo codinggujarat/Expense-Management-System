@@ -90,7 +90,14 @@ def show_employee_dashboard():
                     with col2:
                         st.write(f"**Category:** {expense['category']}")
                         st.write(f"**Status:** {expense['status'].title()}")
-                        st.write(f"**Submitted:** {expense['created_at'].strftime('%Y-%m-%d %H:%M')}")
+                        # Handle created_at field which might be a string or datetime
+                        if isinstance(expense['created_at'], str):
+                            # If it's already a string, use it as is
+                            created_datetime = expense['created_at']
+                        else:
+                            # If it's a datetime object, format it
+                            created_datetime = expense['created_at'].strftime('%Y-%m-%d %H:%M')
+                        st.write(f"**Submitted:** {created_datetime}")
                         
                         # Show approval status button
                         if st.button(f"View Approval Status", key=f"status_{expense['id']}"):
@@ -130,11 +137,25 @@ def show_expense_approval_status(expense_id: int):
                 if step['status'] == 'pending':
                     st.warning("⏳ Pending")
                 elif step['status'] == 'approved':
-                    st.success(f"✅ Approved on {step['approved_at'].strftime('%Y-%m-%d %H:%M')}")
+                    # Handle approved_at field which might be a string or datetime
+                    if isinstance(step['approved_at'], str):
+                        # If it's already a string, use it as is
+                        approved_datetime = step['approved_at']
+                    else:
+                        # If it's a datetime object, format it
+                        approved_datetime = step['approved_at'].strftime('%Y-%m-%d %H:%M')
+                    st.success(f"✅ Approved on {approved_datetime}")
                     if step['comments']:
                         st.write(f"Comments: {step['comments']}")
                 elif step['status'] == 'rejected':
-                    st.error(f"❌ Rejected on {step['approved_at'].strftime('%Y-%m-%d %H:%M')}")
+                    # Handle approved_at field which might be a string or datetime
+                    if isinstance(step['approved_at'], str):
+                        # If it's already a string, use it as is
+                        approved_datetime = step['approved_at']
+                    else:
+                        # If it's a datetime object, format it
+                        approved_datetime = step['approved_at'].strftime('%Y-%m-%d %H:%M')
+                    st.error(f"❌ Rejected on {approved_datetime}")
                     if step['comments']:
                         st.write(f"Comments: {step['comments']}")
     else:
